@@ -1,5 +1,6 @@
 import logging
 import os
+import plexapi
 from plexapi.server import PlexServer
 from pyarr import RadarrAPI
 
@@ -99,10 +100,14 @@ def main():
             
             for server in plex_servers:
                 for library_name in PLEX_LIBRARY_NAMES:
-                    server_for_user = server if user == admin_user else server.switchUser(user)
-                    movie_library = server_for_user.library.section(library_name)
-                    plex_movie = movie_library.get(movie_title)
-                    watched_status_per_server[server.friendlyName] = plex_movie.isWatched
+                    try:
+                        server_for_user = server if user == admin_user else server.switchUser(user)
+                        movie_library = server_for_user.library.section(library_name)
+                        plex_movie = movie_library.get(movie_title)
+                        watched_status_per_server[server.friendlyName] = plex_movie.isWatched
+                    except plexapi.exceptions.NotFound:
+                        # Movie not found in plex
+                        continue
 
             if not watched_status_per_server:
                 continue
