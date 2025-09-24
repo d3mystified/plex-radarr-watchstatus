@@ -83,6 +83,30 @@ def main():
     if admin_user:
         logging.info(f"Admin user identified as: {admin_user}")
 
+    # Build a Plex library lookup map
+    logging.info("Building Plex movie lookup maps...")
+    plex_lookup_maps = {}
+    for server in plex_servers:
+        server_map = {}
+        for library_name in PLEX_LIBRARY_NAMES:
+            try:
+                movie_library = server.library.section(library_name)
+                for plex_movie in movie_library.all():
+                    if not hasattr(plex_movie, 'guids'):
+                        continue
+                    for guid in plex_movie.guids:
+                        if guid.id.startswith('tmdb://'):
+                            try:
+                                tmdb_id = int(guid.id.split('//')[1])
+                                server_map[tmdb_id] = plex_movie.ratingKey
+                                break
+                            except (ValueError, IndexError):
+                                continue
+                logging.info(f"Built map for '{server.friendlyName} - {library_name}' with {len(server_map)} movies.")
+            except Exception as e:
+                logging.warning(f"Could not build map for library '{library_name}' on server '{server.friendlyName}': {e}")
+        plex_lookup_maps[server.machineIdentifier] = server_map
+
     # Get all movies and tags from Radarr
     radarr_movies = radarr.get_movie()
     radarr_tags = radarr.get_tag()
@@ -93,21 +117,29 @@ def main():
     # Main Sync Logic
     for movie in radarr_movies:
         movie_title = movie['title']
-        logging.info(f"Processing movie: {movie_title}")
+        radarr_tmdb_id = movie.get("tmdbId")
+        if not radarr_tmdb_id:
+            logging.info(f"No TMDB Id for movie {movie_title}. Skipping...")
+            continue
+
+        logging.info(f"Processing movie: {movie_title} (TMDB ID: {radarr_tmdb_id})")
+        plex_guid = f"tmdb://{radarr_tmdb_id}"
 
         for user in plex_users:
             watched_status_per_server = {}
             
             for server in plex_servers:
-                for library_name in PLEX_LIBRARY_NAMES:
-                    try:
-                        server_for_user = server if user == admin_user else server.switchUser(user)
-                        movie_library = server_for_user.library.section(library_name)
-                        plex_movie = movie_library.get(movie_title)
-                        watched_status_per_server[server.friendlyName] = plex_movie.isWatched
-                    except plexapi.exceptions.NotFound:
-                        # Movie not found in plex
+                try:
+                    rating_key = plex_lookup_maps.get(server.machineIdentifier, ()).get(radarr_tmdb_id)
+                    if not rating_key:
                         continue
+
+                    server_for_user = server if user == admin_user else server.switchUser(user)
+                    user_specific_plex_movie = server_for_user.fetchItem(rating_key)
+                    watched_status_per_server[server.friendlyName] = user_specific_plex_movie.isWatched
+                except plexapi.exceptions.NotFound:
+                    # Movie not found in plex
+                    continue
 
             if not watched_status_per_server:
                 continue
