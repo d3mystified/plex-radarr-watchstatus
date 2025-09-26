@@ -161,7 +161,6 @@ def main():
                     else:
                         if not tag_id:
                             new_tag = radarr.create_tag(label=tag_name)
-                            print(new_tag)
                             tag_id = new_tag['id']
                             radarr_tags.append(new_tag)
                         
