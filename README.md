@@ -1,5 +1,7 @@
 Sync watch status from Plex server(s) to Radarr using tags.
 
+[![Hippocratic License HL3-BDS-ECO-EXTR-FFD-LAW-MIL](https://img.shields.io/static/v1?label=Hippocratic%20License&message=HL3-BDS-ECO-EXTR-FFD-LAW-MIL&labelColor=5e2751&color=bc8c3d)](https://firstdonoharm.dev/version/3/0/bds-eco-extr-ffd-law-mil.html)
+
 Run with:
 
 ```
